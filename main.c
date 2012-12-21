@@ -8,7 +8,7 @@
 uint8_t buffer[DATA_W/8];
 
 void packet_received() {
-    
+    green(1);
 }
 
 int main(void) {
@@ -26,7 +26,6 @@ int main(void) {
         _delay_ms(500);
         red(count % 2);
         _delay_ms(500);
-        green(count % 2);
         for (uint8_t i = 0; i < DATA_W/8; ++i) {
             buffer[i] = count;
         }
