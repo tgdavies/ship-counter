@@ -6,23 +6,24 @@
 #include "trw24g.h"
 
 void init_trw24g() {
-    // CLK1 and DATA are output
-    CLK1_DDR = 1;
-    DATA_DDR = 1; // will be input in some modes
-    CLK1_PORT = 0; // must start low
-    
+    red(1);
     // CE and CS are output
+    CE_PORT = 0;
+    CS_PORT = 0;
     CE_DDR = 1;
     CS_DDR = 1;
+    // CLK1 and DATA are output
+    CLK1_PORT = 0; // must start low
+    DATA_PORT = 0;
+    CLK1_DDR = 1;
+    DATA_DDR = 1; // will be input in some modes
     
     MCUCR = 0x03; // look for rising edge on INT0
     // enable interrupt INT0 for RX signal
     GIMSK |= (1 << INT0);
     
     _delay_ms(4); // wait for > Tpd2sby
-    red(1);
-    green(1);
-    
+    red(0); 
 }
 
 #define send_bit(byte, n) \
@@ -65,25 +66,31 @@ uint8_t read_byte_trw24g() {
 void set_mode_trw24g(uint8_t mode) {
     CE_PORT = (mode & 0x2) >> 1;
     CS_PORT = (mode & 0x1);
-    _delay_us(10); // wait > Tcs2data or Tce2data
+    _delay_us(200); // wait > Tcs2data or Tce2data
 }
+static uint8_t channel;
+static uint8_t address;
 
-void set_txrx_trw24g(uint8_t mode) {
-    set_mode_trw24g(MODE_CONFIG);
-    DATA_DDR = 1;
-    send_bit(mode, 0);
-    set_mode_trw24g(MODE_STANDBY);
-}
+
 
 static uint8_t* buffer;
 static void (*recv_callback)();
 static uint8_t i; // loop counter
 
-void config_trw24g(uint8_t addr, uint8_t channel, uint8_t* buf, void (*callback)()) {
+void config_trw24g(uint8_t addr, uint8_t chan, uint8_t* buf, void (*callback)()) {
+    address = addr;
+    channel = chan;
     buffer = buf;
     recv_callback = callback;
+    send_config(RX);
+}
+
+void send_config(uint8_t tx_rx) {
+    
     DATA_DDR = 1;
     // send TEST section
+    set_mode_trw24g(MODE_CONFIG);
+
     send_byte_trw24g(0x8E);
     send_byte_trw24g(0x08);
     send_byte_trw24g(0x1C); // PLL control bits zero
@@ -93,11 +100,15 @@ void config_trw24g(uint8_t addr, uint8_t channel, uint8_t* buf, void (*callback)
     for (i = 0; i < 9; ++i) { // all zeroes of address for channel 2, leading zeroes of address for channel 1
         send_byte_trw24g(0);
     }
-    send_byte_trw24g(addr);
+    send_byte_trw24g(address);
     send_byte_trw24g((ADDR_W << 2) | 3); // address width and enable 16 bit CRC
-    send_byte_trw24g(0x4F); // shockburst mode, 250 kbps, 16MHz crystal, 0dBm transmit power
-    send_byte_trw24g((channel << 1) | 1); // receive mode
+    send_byte_trw24g(CM_SHOCKBURST | RFDR_SB_250K | XO_F_16M | RF_PWR_0);
+    send_byte_trw24g((channel << 1) | tx_rx); // receive mode
     set_mode_trw24g(MODE_STANDBY);
+}
+
+void set_txrx_trw24g(uint8_t mode) {
+    send_config(mode);
 }
 
 // assumes data is already set up in buffer
@@ -112,7 +123,7 @@ void send_trw24g(uint8_t addr) {
         send_byte_trw24g(buffer[i]);
     }
     set_mode_trw24g(MODE_STANDBY);
-    _delay_ms(2); // wait for send, probably unnecessary
+    _delay_ms(20); // wait for send, probably unnecessary
     sei(); // enable interrupts
 }
 
@@ -123,6 +134,7 @@ void start_recv_trw24g() {
 }
 
 ISR(INT0_vect) {
+    green(1);
     DATA_DDR = 0; // DATA is an input
     set_mode_trw24g(MODE_STANDBY);
     static uint8_t i;
@@ -131,6 +143,7 @@ ISR(INT0_vect) {
     }
     (*recv_callback)();
     set_mode_trw24g(MODE_ACTIVE);
+    //green(0);
 }
 
 
