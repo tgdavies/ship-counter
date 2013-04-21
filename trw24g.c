@@ -73,17 +73,11 @@ static uint8_t address;
 
 
 
-static uint8_t* buffer;
+static uint8_t* rx_buffer;
+static uint8_t* tx_buffer;
 static void (*recv_callback)();
 static uint8_t i; // loop counter
 
-void config_trw24g(uint8_t addr, uint8_t chan, uint8_t* buf, void (*callback)()) {
-    address = addr;
-    channel = chan;
-    buffer = buf;
-    recv_callback = callback;
-    send_config(RX);
-}
 
 void send_config(uint8_t tx_rx) {
     
@@ -107,6 +101,15 @@ void send_config(uint8_t tx_rx) {
     set_mode_trw24g(MODE_STANDBY);
 }
 
+void config_trw24g(uint8_t addr, uint8_t chan, uint8_t* rx_buf, uint8_t* tx_buf, void (*callback)()) {
+    address = addr;
+    channel = chan;
+    rx_buffer = rx_buf;
+    tx_buffer = tx_buf;
+    recv_callback = callback;
+    send_config(RX);
+}
+
 void set_txrx_trw24g(uint8_t mode) {
     send_config(mode);
 }
@@ -120,7 +123,7 @@ void send_trw24g(uint8_t addr) {
     set_mode_trw24g(MODE_ACTIVE);
     send_byte_trw24g(addr);
     for (i = 0; i < DATA_W/8; ++i) {
-        send_byte_trw24g(buffer[i]);
+        send_byte_trw24g(tx_buffer[i]);
     }
     set_mode_trw24g(MODE_STANDBY);
     _delay_ms(20); // wait for send, probably unnecessary
@@ -139,7 +142,7 @@ ISR(INT0_vect) {
     set_mode_trw24g(MODE_STANDBY);
     static uint8_t i;
     for (i = 0; i < DATA_W / 8; ++i) {
-        buffer[i] = read_byte_trw24g();
+        rx_buffer[i] = read_byte_trw24g();
     }
     (*recv_callback)();
     set_mode_trw24g(MODE_ACTIVE);

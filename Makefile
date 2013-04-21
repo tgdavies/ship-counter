@@ -21,11 +21,11 @@
 DEVICE     = attiny84
 CLOCK      = 8000000
 PROGRAMMER = -c usbtiny
-OBJECTS    = main.o trw24g.o
+OBJECTS    = main.o trw24g.o spi_via_usi_driver.o
 HEADERS	= avrutils.h trw24g.h
 FUSES      = -U hfuse:w:0xd9:m -U lfuse:w:0x24:m
 
-PARAMS=
+PARAMS=-DNODE_1=$(NODE_1)
 
 # ATMega8 fuse bits used above (fuse bits for other devices are different!):
 # Example for 8 MHz internal oscillator

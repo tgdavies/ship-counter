@@ -27,9 +27,9 @@ extern void init_trw24g();
 extern void set_mode_trw24g(uint8_t mode);
 
 #define ADDR_W  (8) // number of bits for address
-#define DATA_W  (32) // bits per packet
+#define DATA_W  (128) /* bits per packet */
 
-extern void config_trw24g(uint8_t addr, uint8_t channel, uint8_t* buf, void (*callback)());
+extern void config_trw24g(uint8_t addr, uint8_t channel, uint8_t* rx_buf, uint8_t* tx_buf, void (*callback)());
 
 #define TX (0)
 #define RX (1)
