@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include "avrutils.h"
 #include "trw24g.h"
+#include "spi_via_usi_driver.h"
+
 
 #ifdef NODE_1
 #define MY_ADDR (0x02)
@@ -31,7 +33,7 @@ uint8_t time_since_send = 0;
 void packet_received() {
     if (rx_buffer[0] == 0x01) { // data
         if (last_received_packet_no != rx_buffer[1]) {
-                green(1);
+                //green(1);
                 last_received_packet_no = rx_buffer[1];
                 // this was a new packet
         }
@@ -84,15 +86,16 @@ void poll_protocol() {
     }
     ++time_since_send;
     if (!packet_acked() && time_since_send > 5) {
-        red(1);
+        //red(1);
         send_packet();
         time_since_send = 0;
         //red(0);
     }
 }
 
+static uint8_t count = 0;
+
 int main(void) {
-    static uint8_t count = 0;
     // set the clock prescaler to 1 to get us an 8MHz clock -- the CKDIV8 fuse is programmed by default, so initial prescaler is /8
     CLKPR = 0x80;
     CLKPR = 0x00;
@@ -110,6 +113,15 @@ int main(void) {
     }
     for (;;) {
         count++;
+        sei();
+        red(1);
+        spiX_wait();
+        red(0);
+        uint8_t c = (count & 0x0f) | 0x30;
+        green(1);
+        spiX_put(c);
+        
+        //spiX_get();
         if (MY_ADDR == 0x01) {
             _delay_ms(90);
         }

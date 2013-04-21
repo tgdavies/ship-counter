@@ -24,6 +24,10 @@
 ****************************************************************************/
 #include <avr/io.h>
 #include <avr/interrupt.h>
+#include <stdint.h>
+
+#include "spi_via_usi_driver.h"
+#include "avrutils.h"
 
 //#include <inavr.h>
 
@@ -76,7 +80,7 @@
  *  SPI module, which means that the byte must be read before the next transfer
  *  completes and overwrites the current value.
  */
-unsigned char storedUSIDR;
+uint8_t storedUSIDR;
 
 
 
@@ -87,13 +91,10 @@ unsigned char storedUSIDR;
  *  for the native SPI module. The flags should not be changed by the user.
  *  The driver takes care of updating the flags when required.
  */
-struct usidriverStatus_t {
-	unsigned char masterMode : 1;       //!< True if in master mode.
-	unsigned char transferComplete : 1; //!< True when transfer completed.
-	unsigned char writeCollision : 1;   //!< True if put attempted during transfer.
-};
+volatile uint8_t masterMode;       //!< True if in master mode.
+volatile uint8_t transferComplete; //!< True when transfer completed.
+volatile uint8_t writeCollision;   //!< True if put attempted during transfer.
 
-volatile struct usidriverStatus_t spiX_status; //!< The driver status bits.
 
 
 
@@ -121,13 +122,13 @@ ISR(USI_OVF_vect)
 {
 	// Master must now disable the compare match interrupt
 	// to prevent more USI counter clocks.
-	if( spiX_status.masterMode == 1 ) {
+	if( masterMode == 1 ) {
 		TIMSK0 &= ~(1<<OCIE0A);
 	}
 	
 	// Update flags and clear USI counter
 	USISR = (1<<USIOIF);
-	spiX_status.transferComplete = 1;
+	transferComplete = 1;
 
 	// Copy USIDR to buffer to prevent overwrite on next transfer.
 	storedUSIDR = USIDR;
@@ -143,7 +144,7 @@ ISR(USI_OVF_vect)
  *
  *  \param spi_mode  Required SPI mode, must be 0 or 1.
  */
-void spiX_initmaster( char spi_mode )
+void spiX_initmaster( uint8_t spi_mode )
 {
 	// Configure port directions.
 	USI_DIR_REG |= (1<<USI_DATAOUT_PIN) | (1<<USI_CLOCK_PIN); // Outputs.
@@ -162,9 +163,9 @@ void spiX_initmaster( char spi_mode )
 	OCR0A = TC0_COMPARE_VALUE;
 	
 	// Init driver status register.
-	spiX_status.masterMode       = 1;
-	spiX_status.transferComplete = 0;
-	spiX_status.writeCollision   = 0;
+	masterMode       = 1;
+	transferComplete = 0;
+	writeCollision   = 0;
 	
 	storedUSIDR = 0;
 }
@@ -179,11 +180,11 @@ void spiX_initmaster( char spi_mode )
  *
  *  \param spi_mode  Required SPI mode, must be 0 or 1.
  */
-void spiX_initslave( char spi_mode )
+void spiX_initslave( uint8_t spi_mode )
 {
 	// Configure port directions.
 	USI_DIR_REG |= (1<<USI_DATAOUT_PIN);                      // Outputs.
-	USI_DIR_REG &= ~(1<<USI_DATAIN_PIN) | (1<<USI_CLOCK_PIN); // Inputs.
+	USI_DIR_REG &= ~((1<<USI_DATAIN_PIN) | (1<<USI_CLOCK_PIN)); // Inputs.
 	USI_OUT_REG |= (1<<USI_DATAIN_PIN) | (1<<USI_CLOCK_PIN);  // Pull-ups.
 	
 	// Configure USI to 3-wire slave mode with overflow interrupt.
@@ -191,9 +192,9 @@ void spiX_initslave( char spi_mode )
 	        (1<<USICS1) | (spi_mode<<USICS0);
 	
 	// Init driver status register.
-	spiX_status.masterMode       = 0;
-	spiX_status.transferComplete = 0;
-	spiX_status.writeCollision   = 0;
+	masterMode       = 0;
+	transferComplete = 1;
+	writeCollision   = 0;
 	
 	storedUSIDR = 0;
 }
@@ -210,30 +211,32 @@ void spiX_initslave( char spi_mode )
  *
  *  \returns  0 if a write collision occurred, 1 otherwise.
  */
-char spiX_put( unsigned char val )
+uint8_t spiX_put( uint8_t val )
 {
+    red(0);
 	// Check if transmission in progress,
 	// i.e. USI counter unequal to zero.
 	if( (USISR & 0x0F) != 0 ) {
 		// Indicate write collision and return.
-		spiX_status.writeCollision = 1;
+		writeCollision = 1;
 		return 0;
 	}
 	
 	// Reinit flags.
-	spiX_status.transferComplete = 0;
-	spiX_status.writeCollision = 0;
+	transferComplete = 0;
+	writeCollision = 0;
 
 	// Put data in USI data register.
 	USIDR = val;
+
 	
 	// Master should now enable compare match interrupts.
-	if( spiX_status.masterMode == 1 ) {
+	if( masterMode == 1 ) {
 		TIFR0 |= (1<<OCF0A);   // Clear compare match flag.
 		TIMSK0 |= (1<<OCIE0A); // Enable compare match interrupt.
 	}
 
-	if( spiX_status.writeCollision == 0 ) return 1;
+	if( writeCollision == 0 ) return 1;
 	return 0;
 }
 
@@ -245,7 +248,7 @@ char spiX_put( unsigned char val )
  *  The transfer complete flag is not checked. Use this function
  *  like you would read from the SPDR register in the native SPI module.
  */
-unsigned char spiX_get()
+uint8_t spiX_get()
 {
 	return storedUSIDR;
 }
@@ -259,7 +262,7 @@ unsigned char spiX_get()
  */
 void spiX_wait()
 {
-	do {} while( spiX_status.transferComplete == 0 );
+	do {} while( transferComplete == 0 );
 }
 
 
