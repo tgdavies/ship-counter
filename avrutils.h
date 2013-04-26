@@ -45,8 +45,8 @@ typedef union
 
 #define setup_leds() {LED1_DD = 1; LED2_DD = 1;}
 
-#define red(on) LED1_P = ~on
+#define red(on) LED1_P = (on ? 0 : 1)
  
-#define green(on) LED2_P = ~on
+#define green(on) LED2_P = (on ? 0 : 1)
 	
 #define timer_diff(start, end) (start > end) ? (0xffff - start + end) : (end - start)

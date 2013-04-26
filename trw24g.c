@@ -6,7 +6,6 @@
 #include "trw24g.h"
 
 void init_trw24g() {
-    red(1);
     // CE and CS are output
     CE_PORT = 0;
     CS_PORT = 0;
@@ -23,7 +22,6 @@ void init_trw24g() {
     GIMSK |= (1 << INT0);
     
     _delay_ms(4); // wait for > Tpd2sby
-    red(0); 
 }
 
 #define send_bit(byte, n) \
@@ -137,7 +135,6 @@ void start_recv_trw24g() {
 }
 
 ISR(INT0_vect) {
-    green(1);
     DATA_DDR = 0; // DATA is an input
     set_mode_trw24g(MODE_STANDBY);
     static uint8_t i;
@@ -146,7 +143,6 @@ ISR(INT0_vect) {
     }
     (*recv_callback)();
     set_mode_trw24g(MODE_ACTIVE);
-    //green(0);
 }
 
 

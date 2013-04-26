@@ -16,7 +16,7 @@ void spiX_initslave( uint8_t spi_mode );
 uint8_t spiX_put( uint8_t val );
 uint8_t spiX_get();
 void spiX_wait();
-
+uint8_t spiX_is_complete();
 
 
 

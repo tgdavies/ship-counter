@@ -253,6 +253,10 @@ uint8_t spiX_get()
 	return storedUSIDR;
 }
 
+uint8_t spiX_is_complete() {
+    return transferComplete;
+}
+
 
 
 /*! \brief  Wait for transfer to complete.
